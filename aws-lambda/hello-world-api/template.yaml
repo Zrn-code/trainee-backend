@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Simple Hello Lambda function
+
+Resources:
+  HelloFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: hello-world/
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      MemorySize: 128
+      Timeout: 3
+      Events:
+        HelloApi:
+          Type: Api
+          Properties:
+            Path: /hello
+            Method: GET
+  LongHelloFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: hello-world/
+      Handler: app.lambda_handler_long
+      Runtime: python3.11
+      MemorySize: 256
+      Timeout: 10 # Increased timeout for long-running function
+      Events:
+        LongHelloApi:
+          Type: Api
+          Properties:
+            Path: /long-hello
+            Method: GET

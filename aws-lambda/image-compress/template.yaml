@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Simple S3 trigger Lambda function using EventBridge
+
+Parameters:
+  SourceBucket:
+    Type: String
+    Default: ''
+    Description: S3 bucket for source images
+
+Resources:
+  SourceBucketResource:
+    Type: AWS::S3::Bucket
+    Properties:
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+
+  CompressedBucketResource:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-compressed-images
+
+  ImageProcessFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.11
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          SOURCE_BUCKET: !Ref SourceBucketResource
+          COMPRESSED_BUCKET: !Ref CompressedBucketResource
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref SourceBucketResource
+        - S3WritePolicy:
+            BucketName: !Ref CompressedBucketResource
+
+  S3EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Trigger Lambda on S3 image upload
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - !Ref SourceBucketResource
+          object:
+            key:
+              - suffix: .jpg
+              - suffix: .jpeg
+              - suffix: .png
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ImageProcessFunction.Arn
+          Id: ImageProcessTarget
+
+  EventBridgeInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ImageProcessFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt S3EventRule.Arn
+
+  # Warm-up mechanism
+  LambdaWarmUpRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Warm up Lambda function every 10 minutes to prevent cold starts
+      ScheduleExpression: rate(10 minutes)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ImageProcessFunction.Arn
+          Id: WarmUpTarget
+          Input: !Sub |
+            {
+              "source": "aws.events",
+              "detail-type": "Lambda Warm-up",
+              "detail": {
+                "message": "Scheduled warm-up event"
+              }
+            }
+
+  WarmUpInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ImageProcessFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt LambdaWarmUpRule.Arn
+
+Outputs:
+  ImageProcessFunction:
+    Description: Image Process Lambda Function ARN
+    Value: !GetAtt ImageProcessFunction.Arn
+
+  CompressedBucket:
+    Description: Compressed Images S3 Bucket
+    Value: !Ref CompressedBucketResource
+
+  S3EventRule:
+    Description: EventBridge Rule ARN
+    Value: !GetAtt S3EventRule.Arn
+
+  LambdaWarmUpRule:
+    Description: Lambda Warm-up Rule ARN
+    Value: !GetAtt LambdaWarmUpRule.Arn
+Metadata:
+  AWS::Composer::Groups:
+    Group:
+      Label: Group
+      Members:
+        - SourceBucketResource
+        - S3EventRule
