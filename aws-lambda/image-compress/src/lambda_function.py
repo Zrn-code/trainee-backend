@@ -62,7 +62,6 @@ def lambda_handler(event, context):
             
             print(f'Image uploaded: {key} in bucket {bucket}')
             print(f'Event name: {event["detail-type"]}')
-            print(f'Event time: {event["time"]}')
             
             # Try to get basic object info, but don't fail if we can't access it
             try:

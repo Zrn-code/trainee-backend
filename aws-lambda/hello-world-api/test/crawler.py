@@ -3,7 +3,8 @@ import requests
 import time
 
 def fetch_data():
-    url = "https://734n6peg0h.execute-api.us-east-1.amazonaws.com/Prod/long-hello"
+    
+    url = "http://localhost:3000/long-hello"  # Local testing URL
     try:
         response = requests.get(url)
         print(f"Status Code: {response.status_code}, Response: {response.text}")
@@ -21,7 +22,7 @@ def main():
         threads.append(thread)
         thread.start()
 
-        # Throttle to ensure 500 requests per second
+        
         if (i + 1) % requests_per_second == 0:
             time.sleep(interval)
 

@@ -1,0 +1,16 @@
+{
+  "HelloFunction": {
+    "httpMethod": "GET",
+    "path": "/hello",
+    "queryStringParameters": {
+      "name": "World"
+    }
+  },
+  "LongHelloFunction": {
+    "httpMethod": "GET",
+    "path": "/long-hello",
+    "queryStringParameters": {
+      "name": "LongWait"
+    }
+  }
+}

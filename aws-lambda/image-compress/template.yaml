@@ -1,11 +1,11 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: Simple S3 trigger Lambda function using EventBridge
 
 Parameters:
   SourceBucket:
     Type: String
-    Default: ''
+    Default: ""
     Description: S3 bucket for source images
 
 Resources:

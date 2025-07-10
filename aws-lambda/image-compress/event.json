@@ -1,0 +1,14 @@
+{
+  "source": "aws.s3",
+  "detail-type": "Object Created",
+  "time": "2025-06-01T12:00:00Z",
+  "region": "us-east-1",
+  "detail": {
+    "bucket": {
+      "name": "image-compress-sourcebucketresource-ypachxn34xkv"
+    },
+    "object": {
+      "key": "bird-8788491_1280.jpg"
+    }
+  }
+}
