@@ -4,7 +4,7 @@ import time
 
 def fetch_data():
     
-    url = "http://localhost:3000/long-hello"  # Local testing URL
+    url = "http://localhost:3000/api/long-hello"  # Local testing URL
     try:
         response = requests.get(url)
         print(f"Status Code: {response.status_code}, Response: {response.text}")

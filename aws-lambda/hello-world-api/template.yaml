@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: Simple Hello Lambda function
 
@@ -15,7 +15,7 @@ Resources:
         HelloApi:
           Type: Api
           Properties:
-            Path: /hello
+            Path: /api/hello
             Method: GET
   LongHelloFunction:
     Type: AWS::Serverless::Function
@@ -29,5 +29,5 @@ Resources:
         LongHelloApi:
           Type: Api
           Properties:
-            Path: /long-hello
+            Path: /api/long-hello
             Method: GET
