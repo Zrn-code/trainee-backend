@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Create a reusable Lambda Layer with requests
+
+Resources:
+  RequestsLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: requests-layer
+      Description: Shared layer with requests
+      ContentUri: layer/
+      CompatibleRuntimes:
+        - python3.11
+        - python3.9
+        - python3.8
+      RetentionPolicy: Retain
+  HelloFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: hello-with-layer
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      CodeUri: hello/
+      Layers:
+        - !Ref RequestsLayer
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /hello
+            Method: get
