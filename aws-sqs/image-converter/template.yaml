@@ -1,0 +1,166 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Image Converter using S3, EventBridge, SQS, and Lambda
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.11
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+Resources:
+  # S3 Bucket for storing images
+  ImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-image-bucket-${Environment}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  # S3 Bucket for converted images
+  ConvertedImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-converted-image-bucket-${Environment}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # SQS Queue for image processing tasks (Standard Queue)
+  ImageProcessingQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${AWS::StackName}-image-processing-queue-${Environment}
+      VisibilityTimeout: 180
+      MessageRetentionPeriod: 1209600 # 14 days
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ImageProcessingDLQ.Arn
+        maxReceiveCount: 5
+
+  # Dead Letter Queue
+  ImageProcessingDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${AWS::StackName}-image-processing-dlq-${Environment}
+      MessageRetentionPeriod: 1209600 # 14 days
+
+  # EventBridge Rule for S3 Object Created events
+  S3ImageUploadRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${AWS::StackName}-s3-image-upload-rule-${Environment}
+      Description: Rule to capture S3 object created events for image files
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - !Ref ImageBucket
+          object:
+            key:
+              - suffix: .jpg
+              - suffix: .jpeg
+              - suffix: .png
+              - suffix: .gif
+              - suffix: .bmp
+              - suffix: .webp
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ImageProcessingQueue.Arn
+          Id: ImageProcessingQueueTarget
+
+  # EventBridge to SQS permission
+  EventBridgeToSQSPermission:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref ImageProcessingQueue
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action:
+              - sqs:SendMessage
+            Resource: !GetAtt ImageProcessingQueue.Arn
+
+  # Lambda function for image processing
+  ImageConverterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-image-converter-${Environment}
+      CodeUri: src/
+      Handler: image_converter.lambda_handler
+      Environment:
+        Variables:
+          SOURCE_BUCKET: !Ref ImageBucket
+          DESTINATION_BUCKET: !Ref ConvertedImageBucket
+          ENVIRONMENT: !Ref Environment
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ImageProcessingQueue.Arn
+            BatchSize: 1
+            MaximumBatchingWindowInSeconds: 5
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref ImageBucket
+        - S3WritePolicy:
+            BucketName: !Ref ConvertedImageBucket
+        - SQSPollerPolicy:
+            QueueName: !GetAtt ImageProcessingQueue.QueueName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
+
+Outputs:
+  ImageBucketName:
+    Description: Name of the S3 bucket for uploading images
+    Value: !Ref ImageBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-ImageBucket
+
+  ConvertedImageBucketName:
+    Description: Name of the S3 bucket for converted images
+    Value: !Ref ConvertedImageBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-ConvertedImageBucket
+
+  ImageProcessingQueueUrl:
+    Description: URL of the SQS queue for image processing
+    Value: !Ref ImageProcessingQueue
+    Export:
+      Name: !Sub ${AWS::StackName}-ImageProcessingQueue
+
+  ImageConverterFunctionArn:
+    Description: ARN of the Lambda function for image conversion
+    Value: !GetAtt ImageConverterFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-ImageConverterFunction

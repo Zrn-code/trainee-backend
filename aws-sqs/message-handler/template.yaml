@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SQS + Lambda with DLQ Example
+
+Resources:
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: MyQueue-DLQ
+
+  SqsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: MyQueue
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 5
+
+  MessageHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: MessageHandler
+      Runtime: python3.11
+      Handler: app.handler
+      CodeUri: src/
+      Timeout: 30 # Set timeout to 30 seconds
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref SqsQueue
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !GetAtt SqsQueue.QueueName
+      Events:
+        SqsEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt SqsQueue.Arn
+            BatchSize: 1
+
+Outputs:
+  QueueURL:
+    Description: URL of the main SQS queue
+    Value: !Ref SqsQueue
+
+  DLQURL:
+    Description: URL of the dead-letter queue
+    Value: !Ref DeadLetterQueue
+
+  LambdaFunction:
+    Description: Lambda function name
+    Value: !Ref MessageHandlerFunction
